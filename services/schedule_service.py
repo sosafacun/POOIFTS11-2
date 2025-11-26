@@ -21,8 +21,6 @@ class ScheduleService:
         return sched
 
     def create(self):
-        ui.show_loading_message("Schedule Menu")
-
         if not GlobalState.clients:
             ui.warning_message("No clients found. Register one first.")
             ui.pause()
@@ -30,57 +28,30 @@ class ScheduleService:
 
         client = ui.live_search(GlobalState.clients, "Find Client")
         if not client:
-            ui.warning_message("Operation cancelled.")
-            ui.pause()
             return
 
-        client_id = client.id
-
-        rows = read_filtered(date.today().year)
-        target_date = ui.pick_calendar_date(rows)
-        if not target_date:
+        target_day = self._pick_day()
+        if not target_day:
             return
 
         employee = ui.pick_employee(GlobalState.employees)
         if not employee:
             return
 
-        employee_id = employee.internal_id
-
-        day_data = self.schedule.get_day(target_date)
-        slots_for_employee = day_data.get(employee_id, {})
-
-        free_slots = [
-            slot for slot, status in slots_for_employee.items()
-            if status == "free"
-        ]
-
-        if not free_slots:
-            ui.warning_message("No available slots for that employee.")
+        slots = self._select_slots(target_day, mode="create")[0]
+        if not slots:
+            ui.warning_message("No free slots for this employee.")
             ui.pause()
             return
 
-        selected_slots = ui.pick_slots(slots_for_employee)
-        if not selected_slots:
-            return
+        flat = [(employee.internal_id, s, None) for s in slots]
+        indices = range(len(flat))
+        self._apply_changes(target_day, flat, indices, client.id)
 
-        try:
-            for slot in selected_slots:
-                self._reserve(target_date, employee_id, slot, client_id)
-
-            ui.center(
-                ui.make_panel(
-                    "Appointment Saved",
-                    f"{client_id} → {target_date} {slot} | {employee}"
-                )
-            )
-        except Exception as e:
-            ui.throw_exception("Error creating appointment", e)
-
-        ui.pause()
+        ui.show_message(f"Saved {len(slots)} appointment(s).")
 
     def read(self):
-        groups = self._day_to_dict(self.today, False)
+        groups = self._day_to_dict(self.today)
 
         if not groups:
             ui.show_message(f"No booked appointments for {self.today}")
@@ -90,10 +61,31 @@ class ScheduleService:
         ui.paginate_sectioned(groups)
 
     def update(self):
-        pass
+        target_day, data, error = self._get_day_and_slots(mode="update")
+        if error:
+            ui.warning_message(error); ui.pause(); return
+
+        flat, _ = data
+
+        new_client = ui.live_search(GlobalState.clients, "Assign client")
+        if not new_client:
+            return
+
+        self._apply_changes(target_day, flat, range(len(flat)), new_client.id)
+        ui.show_message(f"Updated {len(flat)} appointment(s).")
 
     def delete(self):
-        pass
+        target_day, data, error = self._get_day_and_slots(mode="delete")
+        if error:
+            ui.warning_message(error); ui.pause(); return
+
+        flat, _ = data
+
+        if not ui.confirm_action(f"Delete {len(flat)} appointment(s)?", ""):
+            return
+
+        self._apply_changes(target_day, flat, range(len(flat)), "free")
+        ui.show_message(f"Deleted {len(flat)} appointment(s).")
 
     def search(self):
         pass
@@ -146,21 +138,8 @@ class ScheduleService:
                         if value == old_client_id:
                             slots[slot] = new_client_id
 
-    def _reserve(self, target_date, employee_id, slot, value):
-        sched = self.schedule
-
-        sched.ensure_day(target_date)
-
-        if not sched.is_slot_free(target_date, employee_id, slot):
-            raise ValueError("Slot unavailable.")
-
-        sched.set_slot(target_date, employee_id, slot, value)
-
-        GlobalState.schedule = sched.data
-        GlobalState.save()
-
-    def _day_to_dict(self, target_date, filter_free):
-        day = GlobalState.schedule.get(target_date.isoformat(), {})
+    def _day_to_dict(self, target_day):
+        day = GlobalState.schedule.get(target_day.isoformat(), {})
         result = {}
 
         for emp_id, slots in day.items():
@@ -171,9 +150,6 @@ class ScheduleService:
             entry_list = []
             for time_slot, client_id in slots.items():
 
-                if filter_free and client_id == "free":
-                    continue
-
                 if client_id == "free":
                     entry_list.append(f"{time_slot} → (free)")
                 else:
@@ -181,8 +157,85 @@ class ScheduleService:
                     name = f"{client.last_name}, {client.name}" if client else "UNKNOWN"
                     entry_list.append(f"{time_slot} → {name} ({client_id})")
 
-            if entry_list:
-                header = f"{employee.last_name}, {employee.name} ({emp_id})"
-                result[header] = entry_list
+            header = f"{employee.last_name}, {employee.name} ({emp_id})"
+            result[header] = entry_list
 
         return result
+
+    def _pick_day(self):
+        rows = read_filtered(date.today().year)
+        if not rows:
+            return None
+
+        ui._show_calendar(rows)
+        valid = {str(i+1): r["date"] for i, r in enumerate(rows)}
+        choice = ui._option_select(list(valid.keys()), "1")
+
+        return date.fromisoformat(valid[choice])
+
+    def _pick_client(self):
+        return ui.live_search(GlobalState.clients, "Select new client")
+
+    def _select_slots(self, target_day, mode="update"):
+        groups = self._day_to_dict(target_day)
+        if not groups:
+            return None, None
+
+        merged = {}
+        for header, items in groups.items():
+            emp_id = header.split("(")[-1].strip(")")
+            for line in items:
+                slot = line.split("→")[0].strip()
+                merged[f"{emp_id}|{slot}"] = line
+
+        slot_state = {}
+
+        for key, line in merged.items():
+            is_free = "(free)" in line
+
+            if mode == "create":
+                slot_state[key] = "free" if is_free else "taken"
+            else:
+                slot_state[key] = "free"
+
+        selected_keys = ui.pick_slots(slot_state)
+        if not selected_keys:
+            return None, None
+
+        flat = []
+        for key in selected_keys:
+            emp_id, slot = key.split("|")
+            flat.append((emp_id, slot, merged[key]))
+
+        return flat, list(range(len(flat)))
+
+    def _get_day_and_slots(self, mode="update"):
+        target_day = self._pick_day()
+        if not target_day:
+            return None, None, "No schedules available."
+
+        flat, selected = self._select_slots(target_day, mode)
+        if not flat:
+            return None, None, "Nothing found for that day."
+
+        return target_day, (flat, selected), None
+
+    def _apply_changes(self, target_day, flat, indices, value):
+        sched = self.schedule
+        for i in indices:
+            emp_id, slot, _ = flat[i]
+            sched.set_slot(target_day, emp_id, slot, value)
+
+        GlobalState.schedule = sched.data
+        GlobalState.save()
+
+    def _pick_free_slots(self, target_day, employee_id):
+        day = self.schedule.get_day(target_day)
+        slots = day.get(employee_id, {})
+
+        free = [slot for slot, val in slots.items() if val == "free"]
+        if not free:
+            return None
+
+        selected = ui.pick_slots(slots)
+        return selected
