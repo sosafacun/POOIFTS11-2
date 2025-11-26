@@ -9,6 +9,7 @@ class ScheduleService:
     def __init__(self, employees, slots):
         self.employees = employees
         self.slots = slots
+        self.today = date.today()
 
     @property
     def schedule(self):
@@ -22,7 +23,6 @@ class ScheduleService:
     def create(self):
         ui.show_loading_message("Schedule Menu")
 
-        #step 1: pick client
         if not GlobalState.clients:
             ui.warning_message("No clients found. Register one first.")
             ui.pause()
@@ -36,20 +36,17 @@ class ScheduleService:
 
         client_id = client.id
 
-        #step 2: pick date
         rows = read_filtered(date.today().year)
         target_date = ui.pick_calendar_date(rows)
         if not target_date:
             return
 
-        #step 3: pick employee
         employee = ui.pick_employee(GlobalState.employees)
         if not employee:
             return
 
         employee_id = employee.internal_id
 
-        #step 4: determine availability
         day_data = self.schedule.get_day(target_date)
         slots_for_employee = day_data.get(employee_id, {})
 
@@ -63,12 +60,10 @@ class ScheduleService:
             ui.pause()
             return
 
-        #step 5: pick slot(s)
         selected_slots = ui.pick_slots(slots_for_employee)
         if not selected_slots:
             return
 
-        #step 6: finalize reservation
         try:
             for slot in selected_slots:
                 self._reserve(target_date, employee_id, slot, client_id)
@@ -85,8 +80,14 @@ class ScheduleService:
         ui.pause()
 
     def read(self):
-        today = date.today()
-        return self.get_day(today)
+        groups = self._day_to_dict(self.today, False)
+
+        if not groups:
+            ui.show_message(f"No booked appointments for {self.today}")
+            ui.pause()
+            return
+
+        ui.paginate_sectioned(groups)
 
     def update(self):
         pass
@@ -115,7 +116,7 @@ class ScheduleService:
             #on employee delete, remove all their schedules
             if old_employee_id:
                 for day in list(schedule.keys()):
-                    if day < today:
+                    if day < self.today:
                         continue
                     schedule[day].pop(old_employee_id, None)
                 return
@@ -123,7 +124,7 @@ class ScheduleService:
             #on employee delete, remove all their schedules from the employees
             if old_client_id:
                 for day, employees in schedule.items():
-                    if day < today:
+                    if day < self.today:
                         continue
                     for emp, slots in employees.items():
                         for slot, value in slots.items():
@@ -157,3 +158,31 @@ class ScheduleService:
 
         GlobalState.schedule = sched.data
         GlobalState.save()
+
+    def _day_to_dict(self, target_date, filter_free):
+        day = GlobalState.schedule.get(target_date.isoformat(), {})
+        result = {}
+
+        for emp_id, slots in day.items():
+            employee = next((e for e in GlobalState.employees if e.internal_id == emp_id), None)
+            if not employee:
+                continue
+
+            entry_list = []
+            for time_slot, client_id in slots.items():
+
+                if filter_free and client_id == "free":
+                    continue
+
+                if client_id == "free":
+                    entry_list.append(f"{time_slot} → (free)")
+                else:
+                    client = next((c for c in GlobalState.clients if c.id == client_id), None)
+                    name = f"{client.last_name}, {client.name}" if client else "UNKNOWN"
+                    entry_list.append(f"{time_slot} → {name} ({client_id})")
+
+            if entry_list:
+                header = f"{employee.last_name}, {employee.name} ({emp_id})"
+                result[header] = entry_list
+
+        return result

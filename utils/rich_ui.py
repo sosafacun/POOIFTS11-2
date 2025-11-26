@@ -323,7 +323,29 @@ class RichUI:
         RichUI.clear()
         RichUI.center(RichUI._build_month_panel(rows))
         RichUI.pause()
+    
+    @staticmethod
+    def paginate_sectioned(groups: dict):
 
+        headers = list(groups.keys())
+        total = len(headers)
+        index = 0
+
+        while True:
+            RichUI.clear()
+
+            header = headers[index]
+            items = groups[header]
+
+            RichUI.console.print(f"\n[bold]{header}[/bold]\n" + "─" * len(header))
+            for line in items:
+                RichUI.console.print(f"  {line}")
+
+            new_index = RichUI._paginate_nav(index, total)
+            if new_index is None:
+                break
+
+            index = new_index
     #----------------------------------------------
     #----------------------------------------------
     #----------------STATIC OPS--------------------
@@ -431,7 +453,7 @@ class RichUI:
         return panels
 
     @staticmethod
-    def _paginate(items, page_size):
+    def _paginate(items, page_size=6):
         if not items:
             RichUI.warning_message("No items to display.")
             RichUI.pause()
@@ -445,23 +467,14 @@ class RichUI:
 
             start = index * page_size
             chunk = items[start:start + page_size]
-
             panels = RichUI._make_cards(chunk)
             RichUI.center(Columns(panels, equal=True, expand=True))
 
-            nav_text = f"[dim]Page {index+1}/{pages} | '.' next | ',' prev | 'Q' Go Back[/dim]"
-            RichUI.console.print(f"\n{nav_text}")
-
-            choice = Prompt.ask("", choices=[".", ",", "Q", "q"], default="Q")
-
-            if choice.upper() == "Q":
+            new_index = RichUI._paginate_nav(index, pages)
+            if new_index is None:
                 break
 
-            if choice == "." and index < pages - 1:
-                index += 1
-
-            elif choice == "," and index > 0:
-                index -= 1
+            index = new_index
 
     @staticmethod
     def _show_loading_bar():
@@ -502,3 +515,21 @@ class RichUI:
         valid_keys = [key.lower() for key, _ in items]
 
         return RichUI._option_select(valid_keys, "Q")
+
+    @staticmethod
+    def _paginate_nav(index, total):
+        nav = f"\nPage {index+1}/{total} | '.' next | ',' prev | 'Q' Back"
+        RichUI.console.print(f"[dim]{nav}[/dim]")
+
+        choice = Prompt.ask("", choices=[".", ",", "Q", "q"], default="Q")
+
+        if choice.upper() == "Q":
+            return None  # Signal exit
+
+        if choice == "." and index < total - 1:
+            return index + 1
+
+        if choice == "," and index > 0:
+            return index - 1
+
+        return index
