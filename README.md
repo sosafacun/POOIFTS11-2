@@ -59,8 +59,11 @@ Final Project for OOP at IFTS N°11
 - CRUD appointments
 - Check for valid (non-empty) data (no DOB, no name)
 - Add some *color* to the CMD and make it look pretty.
-- A week should be a vector that contains an array of possible schedules. One for each employee. This would turn a month into a 3D matrix, maybe?. <- This wasn't in the previous one and I was pulling my hair off thinking of ways to manage dates and schedules.
+- A week should be a vector that contains an array of possible schedules. One for each employee. This would turn a month into a 3D matrix, maybe?. <- This wasn't in the previous one and I was pulling my hair off thinking of ways to manage dates and schedules with datetime hours.
 - The system will take the year it's currently in, and check for the file for that year.
     - If no file is in place, then it should create a new one (so in January 1st it should create 2026.csv) with all the possible weeks for the year.
     - So if February starts on a Wednesday, It will mark as Monday and Tuesday as non-working days (since they don't belong in February but in January) and mark Wednesday as the first working day.
-- The schedule should show only 2 weeks in advance. Any more will not be shown unless the user wants to see the entire month.
+- Using those generated yearly weeks, I can show the user during creation all the available and taken spots for each employee.
+- The schedule should show only 2 weeks in advance (so the current week + 2 more) during schedule creation. 
+- Any more weeks will not be shown unless the user wants to see the entire month or entire months selected.
+- I have to check if 2 appointments happen at the same time to deny it happening.

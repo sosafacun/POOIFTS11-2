@@ -1,6 +1,5 @@
 from utils.rich_ui import RichUI as ui
 
-#this took so long omg i need a break. why didn't i plan this ahead of time?
 class CRUDController():
     #to create a controller you need the name (used for the ui), a service (used to control what each handler does)
     #and the ui to avoid from utils.rich_ui import RichUI as ui
@@ -8,6 +7,16 @@ class CRUDController():
         self.name = name
         self.service = service
         self.ui = ui
+
+    def crud_menu(self):
+        return [
+            ("1", f"Register new {self.name}"),
+            ("2", f"View all {self.name}"),
+            ("3", f"Update existing {self.name}"),
+            ("4", f"Delete existing {self.name}"),
+            ("5", f"Search for {self.name}"),
+            ("Q", "Go back to the main menu")
+        ]
 
     #run_menu is just RichUI's simple_menu on steroids. It launches the menu creation.    
     def run_menu(self, menu_items):
@@ -32,5 +41,5 @@ class CRUDController():
             if action:
                 action()
         except Exception as e:
-            ui.throw_exception("CRUD Controller.py handler Exception. No service in place.", e)
+            ui.throw_exception("Exception", e)
             
