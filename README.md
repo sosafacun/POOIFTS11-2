@@ -17,7 +17,6 @@ Final Project for OOP at IFTS N°11
         3. Install the required dependencies by writing `pip install -r requirements.txt`
 3. Run main.py from the venv
 
-
 ## Functional Requirements
 
 - CMD execution
@@ -27,8 +26,8 @@ Final Project for OOP at IFTS N°11
 - Read the data from the .csv file and turn it into a dictionary
 - Must use OOP and *at least* the following classes:
     - Client
-    - Appointment
-    - Hairdresser or Appointment. This will manage all the main operations.
+    - Schedule
+    - Hairdresser or Appointment. This will manage all the main operations. -> I used services.
 - The system must have an interactive main menu with options like:
     - Register new client
     - Schedule new appointment
@@ -37,23 +36,17 @@ Final Project for OOP at IFTS N°11
     - Save / Load data
     - Exit app
 
-### How to handle data and data files
+# Suggestions and personal goals
 
+## Implemented:
 - Every time data is being saved, it must save the info into the dictionary and then save it to the csv
 - The app must be able to convert from .csv to dict and from dict to .csv to achieve the feeling of a persistent database
 - Whenever the app starts, it must load the .csv file automatically.
-
-## Suggestions and personal goals
 - Cannot make appointments at the same time for the same employee.
 - Allow client, date or employee filtering.
 - Handle exceptions.
-- Use DateTime to handle schedules.
 - Ask the user to confirm an old or new appointment. Once confirmed, the system has to save that date to the .csv, and load it.
-- Whenever the user exits or cancels an operation, they have to confirm that there are unsaved changes that are going to be lost; as each time the main menu loads the .csv is read again to maintain data integrity.
-- Does it have to be Python?
-- Register the DOB of both clients and employees.
-    - Employees' DOB will be used to grant them a full-pay free day.
-    - Clients' DOB will be used to grant them a free haircut, available for the next 7 days (weekends included).
+- Does it have to be Python? - Sadly, yes
 - CRUD clients
 - CRUD employees
 - CRUD appointments
@@ -66,4 +59,17 @@ Final Project for OOP at IFTS N°11
 - Using those generated yearly weeks, I can show the user during creation all the available and taken spots for each employee.
 - The schedule should show only 2 weeks in advance (so the current week + 2 more) during schedule creation. 
 - Any more weeks will not be shown unless the user wants to see the entire month or entire months selected.
-- I have to check if 2 appointments happen at the same time to deny it happening.
+
+## TODO:
+- Set holidays, vacation and non-working days for either single or all employees.
+
+## Half and half
+- Whenever the user exits or cancels an operation, they have to confirm that there are unsaved changes that are going to be lost; as each time the main menu loads the .csv is read again to maintain data integrity. **NOTE**: This happens every time they've reached the end of the operation. Any cancelled operation will be exited with no confirmation.
+- Register the DOB of both clients and employees.
+    - Employees' DOB will be used to grant them a full-pay free day.
+    - Clients' DOB will be used to grant them a free haircut, available for the next 7 days (weekends included).
+    
+    **NOTE**: The logic is missing, but the building blocks are there.
+
+## Dropped:
+- Use DateTime to handle schedules. - I HATE working with dates. Thank me I used today to make a pretty (ponele) calendar.
